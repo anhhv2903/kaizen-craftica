@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Craftica - Hồ Sơ Sáng Kiến Cải Tiến (Kaizen)</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #faf9f5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1e293b; padding: 20px; }
+    .container { max-width: 1360px; margin: 0 auto; }
+    .header { text-align: center; border-bottom: 3px solid #334155; padding-bottom: 12px; margin-bottom: 20px; }
+    .header h1 { font-size: 20px; color: #0f172a; margin-top: 5px; }
+    .header .sub { font-size: 11px; color: #64748b; }
+    
+    .sync-status { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; padding: 4px 8px; border-radius: 20px; background: #e2e8f0; margin-bottom: 12px; }
+    .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; }
+    
+    .nav-tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .nav-btn { padding: 9px 18px; border-radius: 6px; border: 1px solid #cbd5e1; cursor: pointer; font-size: 13px; font-weight: 600; background: #f8fafc; color: #334155; }
+    .nav-btn.active { background: #334155; color: #ffffff; border-color: #334155; }
+    
+    .sec { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 18px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+    .sec h3 { font-size: 13.5px; margin-bottom: 12px; color: #1e293b; border-bottom: 2px solid #f1f5f9; padding-bottom: 6px; }
+    .lbl { font-size: 11px; font-weight: 600; color: #475569; display: block; margin-bottom: 4px; }
+    .app-input { font-size: 12.5px; padding: 7px 9px; border: 1px solid #cbd5e1; border-radius: 5px; font-family: inherit; width: 100%; box-sizing: border-box; }
+    textarea.app-input { resize: vertical; min-height: 56px; }
+    
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .row4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .fld { margin-bottom: 10px; }
+    
+    .app-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .app-table th, .app-table td { border: 1px solid #e2e8f0; padding: 7px 9px; text-align: left; vertical-align: top; }
+    .app-table th { background: #f8fafc; font-size: 11px; color: #475569; }
+    
+    .btn-submit { background: #334155; color: #ffffff; border: none; border-radius: 6px; padding: 10px 20px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn-secondary { background: #ffffff; color: #334155; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 20px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .action-btn { background: none; border: none; cursor: pointer; font-size: 11px; font-weight: 600; }
+    .btn-edit { color: #2563eb; }
+    .btn-del { color: #dc2626; margin-left: 8px; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <div style="font-size:10px;letter-spacing:0.1em;color:#64748b;text-transform:uppercase;">Craftica — Xưởng Sơn Mài TDM</div>
+    <h1>HỒ SƠ SÁNG KIẾN CẢI TIẾN (KAIZEN)</h1>
+    <div class="sub">Hệ thống đồng bộ dữ liệu Real-time qua Cloud Database</div>
+  </div>
+
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <div class="nav-tabs">
+      <button class="nav-btn active" id="tabQuickBtn" onclick="switchTab('quick')">Phiếu nhanh (cho thợ)</button>
+      <button class="nav-btn" id="tabFormBtn" onclick="switchTab('form')">Hồ sơ đầy đủ</button>
+      <button class="nav-btn" id="tabTrackerBtn" onclick="switchTab('tracker')">Sổ theo dõi (<span id="countDisplay">0</span>)</button>
+    </div>
+    <div class="sync-status">
+      <div class="sync-dot" id="syncIndicator"></div>
+      <span id="syncText">Đã đồng bộ Real-time</span>
+    </div>
+  </div>
+
+  <!-- 1. TAB PHIẾU NHANH -->
+  <div id="panelQuick">
+    <div class="sec" style="max-width:760px; margin:0 auto;">
+      <h3>Phiếu ghi sáng kiến nhanh</h3>
+      <div class="row2">
+        <div class="fld"><label class="lbl">Họ tên bạn</label><input class="app-input" id="q_tacGia" type="text"></div>
+        <div class="fld"><label class="lbl">Bộ phận / Tổ</label><input class="app-input" id="q_boPhan" type="text"></div>
+      </div>
+      <div class="fld"><label class="lbl">1. Bạn muốn cải tiến việc gì? (đặt tên ngắn)</label><input class="app-input" id="q_tenCaiTien" type="text" placeholder="VD: Giảm thời gian gá phôi ở máy mài"></div>
+      <div class="fld"><label class="lbl">2. Hiện tại đang làm như thế nào? (Bất tiện/mất thời gian/hao phí)</label><textarea class="app-input" id="q_tinhTrangTruoc" placeholder="VD: Mỗi lần gá mất 10 phút, phải chỉnh lại 2-3 lần"></textarea></div>
+      <div class="fld"><label class="lbl">3. Bạn đề xuất làm khác đi như thế nào?</label><textarea class="app-input" id="q_noiDungGiaiPhap" placeholder="VD: Làm thêm 1 khuôn gá sẵn để không phải chỉnh lại"></textarea></div>
+      <div class="fld"><label class="lbl">4. Nếu áp dụng thì lợi ích là gì?</label><textarea class="app-input" id="q_loiIchDuKien" placeholder="VD: Giảm còn 3 phút/lần, đỡ mỏi tay"></textarea></div>
+      <div style="display:flex; justify-content:flex-end;">
+        <button class="btn-submit" onclick="submitQuick()">Gửi phiếu nhanh</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. TAB HỒ SƠ ĐẦY ĐỦ -->
+  <div id="panelForm" style="display:none;">
+    <div class="sec">
+      <h3>1. Đăng ký sáng kiến — FM.01</h3>
+      <div class="row4">
+        <div class="fld"><label class="lbl">Số phiếu SKCT</label><input class="app-input" id="f_soPhieu" type="text"></div>
+        <div class="fld"><label class="lbl">Ngày đăng ký</label><input class="app-input" id="f_ngayDangKy" type="date"></div>
+        <div class="fld"><label class="lbl">Họ tên tác giả</label><input class="app-input" id="f_tacGia" type="text"></div>
+        <div class="fld"><label class="lbl">Mã số NV</label><input class="app-input" id="f_maNV" type="text"></div>
+      </div>
+      <div class="row3">
+        <div class="fld"><label class="lbl">Bộ phận</label><input class="app-input" id="f_boPhan" type="text"></div>
+        <div class="fld"><label class="lbl">Chức vụ</label><input class="app-input" id="f_chucVu" type="text"></div>
+        <div class="fld"><label class="lbl">Tên cải tiến</label><input class="app-input" id="f_tenCaiTien" type="text"></div>
+      </div>
+      <div class="fld"><label class="lbl">Tình trạng trước cải tiến</label><textarea class="app-input" id="f_tinhTrangTruoc"></textarea></div>
+      <div class="fld"><label class="lbl">Nội dung giải pháp</label><textarea class="app-input" id="f_noiDungGiaiPhap"></textarea></div>
+      <div class="fld"><label class="lbl">Lợi ích dự kiến</label><textarea class="app-input" id="f_loiIchDuKien"></textarea></div>
+      <div class="row2">
+        <div class="fld"><label class="lbl">Ý kiến cán bộ phụ trách</label><textarea class="app-input" id="f_yKienCanBo"></textarea></div>
+        <div class="fld"><label class="lbl">Ý kiến Ban SKCT</label><textarea class="app-input" id="f_yKienBanSKCT"></textarea></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h3>2. Đánh giá & Phê duyệt</h3>
+      <div class="row3">
+        <div class="fld"><label class="lbl">Đánh giá TBP</label><input class="app-input" id="f_danhGiaTBP" type="text"></div>
+        <div class="fld"><label class="lbl">Phê duyệt khen thưởng</label><input class="app-input" id="f_khenThuong" type="text"></div>
+        <div class="fld">
+          <label class="lbl">Trạng thái hồ sơ</label>
+          <select class="app-input" id="f_trangThai">
+            <option value="Mới đăng ký">Mới đăng ký</option>
+            <option value="Đang triển khai">Đang triển khai</option>
+            <option value="Đã hoàn thành">Đã hoàn thành</option>
+            <option value="Đã chuẩn hoá">Đã chuẩn hoá</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex; justify-content:flex-end; gap:10px;">
+      <button class="btn-secondary" onclick="resetForm()">Làm mới form</button>
+      <button class="btn-submit" onclick="submitFullForm()">Lưu vào Sổ theo dõi</button>
+    </div>
+  </div>
+
+  <!-- 3. TAB SỔ THEO DÕI -->
+  <div id="panelTracker" style="display:none;">
+    <div class="sec">
+      <h3>Sổ theo dõi sáng kiến cải tiến — FM.03</h3>
+      <div style="overflow-x:auto;">
+        <table class="app-table">
+          <thead>
+            <tr>
+              <th style="width:40px;">TT</th>
+              <th>Số phiếu</th>
+              <th>Tác giả</th>
+              <th>Bộ phận</th>
+              <th>Ngày ĐK</th>
+              <th>Tên cải tiến</th>
+              <th>Giải pháp</th>
+              <th>Trạng thái</th>
+              <th style="width:100px;">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody id="trackerTableBody">
+            <tr><td colspan="9" style="text-align:center; padding:15px; color:#94a3b8;">Đang tải dữ liệu Cloud...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

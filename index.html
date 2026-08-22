@@ -35,6 +35,7 @@
     .app-table th { background: #f8fafc; font-size: 11px; color: #475569; }
     
     .btn-submit { background: #334155; color: #ffffff; border: none; border-radius: 6px; padding: 10px 20px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn-submit:disabled { background: #94a3b8; cursor: not-allowed; }
     .btn-secondary { background: #ffffff; color: #334155; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 20px; font-size: 13px; font-weight: 600; cursor: pointer; }
     .action-btn { background: none; border: none; cursor: pointer; font-size: 11px; font-weight: 600; }
     .btn-edit { color: #2563eb; }
@@ -75,7 +76,7 @@
       <div class="fld"><label class="lbl">3. Bạn đề xuất làm khác đi như thế nào?</label><textarea class="app-input" id="q_noiDungGiaiPhap" placeholder="VD: Làm thêm 1 khuôn gá sẵn để không phải chỉnh lại"></textarea></div>
       <div class="fld"><label class="lbl">4. Nếu áp dụng thì lợi ích là gì?</label><textarea class="app-input" id="q_loiIchDuKien" placeholder="VD: Giảm còn 3 phút/lần, đỡ mỏi tay"></textarea></div>
       <div style="display:flex; justify-content:flex-end;">
-        <button class="btn-submit" onclick="submitQuick()">Gửi phiếu nhanh</button>
+        <button class="btn-submit" id="btnQuickSubmit" onclick="submitQuick()">Gửi phiếu nhanh</button>
       </div>
     </div>
   </div>
@@ -123,14 +124,17 @@
 
     <div style="display:flex; justify-content:flex-end; gap:10px;">
       <button class="btn-secondary" onclick="resetForm()">Làm mới form</button>
-      <button class="btn-submit" onclick="submitFullForm()">Lưu vào Sổ theo dõi</button>
+      <button class="btn-submit" id="btnFullSubmit" onclick="submitFullForm()">Lưu vào Sổ theo dõi</button>
     </div>
   </div>
 
   <!-- 3. TAB SỔ THEO DÕI -->
   <div id="panelTracker" style="display:none;">
     <div class="sec">
-      <h3>Sổ theo dõi sáng kiến cải tiến — FM.03</h3>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 style="border-bottom:none; margin-bottom:0;">Sổ theo dõi sáng kiến cải tiến — FM.03</h3>
+        <button class="btn-secondary" style="padding: 5px 12px; font-size:12px;" onclick="loadData()">🔄 Tải lại dữ liệu</button>
+      </div>
       <div style="overflow-x:auto;">
         <table class="app-table">
           <thead>
@@ -156,9 +160,8 @@
 </div>
 
 <script>
-  // Dán URL HTTP Endpoint từ Power Automate vào đây
-  const FLOW_GET_URL = "https://defaultb9f85395de73470c8b9140e902d6d9.2f.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/25/workflows/cd27de19ce4e492cbef3e067169c465b/triggers/manual/paths/invoke?api-version=1";
-  const FLOW_POST_URL = "https://defaultb9f85395de73470c8b9140e902d6d9.2f.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/25/workflows/cd27de19ce4e492cbef3e067169c465b/triggers/manual/paths/invoke?api-version=1";
+  // Điền HTTP Trigger Endpoint từ Power Automate tại đây
+  const FLOW_API_URL = "https://defaultb9f85395de73470c8b9140e902d6d9.2f.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/25/workflows/cd27de19ce4e492cbef3e067169c465b/triggers/manual/paths/invoke?api-version=1";
 
   let entriesList = [];
   let editingId = null;
@@ -174,24 +177,33 @@
   }
 
   async function loadData() {
-    if (FLOW_GET_URL.includes("PASTE_")) {
+    if (!FLOW_API_URL || FLOW_API_URL.includes("PASTE_")) {
       document.getElementById('syncIndicator').style.background = '#eab308';
       document.getElementById('syncText').innerText = 'Chưa cấu hình API URL';
       return;
     }
 
     try {
+      document.getElementById('syncIndicator').style.background = '#eab308';
       document.getElementById('syncText').innerText = 'Đang tải dữ liệu...';
-      const res = await fetch(FLOW_GET_URL);
-      const data = await res.json();
       
-      entriesList = data || [];
+      // Gửi POST request với action READ để lấy dữ liệu danh sách
+      const res = await fetch(FLOW_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'GET_ALL' })
+      });
+
+      if (!res.ok) throw new Error("Lỗi HTTP Status: " + res.status);
+      
+      const data = await res.json();
+      entriesList = Array.isArray(data) ? data : (data.items || []);
       renderTable();
       
       document.getElementById('syncIndicator').style.background = '#22c55e';
       document.getElementById('syncText').innerText = 'Đã đồng bộ Cloud';
     } catch (err) {
-      console.error(err);
+      console.error("Load Data Error:", err);
       document.getElementById('syncIndicator').style.background = '#ef4444';
       document.getElementById('syncText').innerText = 'Lỗi kết nối CSDL';
     }
@@ -224,48 +236,57 @@
   }
 
   async function submitQuick() {
+    const tenCaiTien = document.getElementById('q_tenCaiTien').value;
+    if (!tenCaiTien.trim()) {
+      alert("Vui lòng nhập tên cải tiến!");
+      return;
+    }
+
+    editingId = null; // Đảm bảo không dính ID đang sửa ở form đầy đủ
     const payload = {
       action: 'CREATE',
       soPhieu: 'QN-' + Date.now().toString().slice(-4),
       ngayDangKy: new Date().toISOString().slice(0, 10),
       tacGia: document.getElementById('q_tacGia').value,
       boPhan: document.getElementById('q_boPhan').value,
-      tenCaiTien: document.getElementById('q_tenCaiTien').value,
+      tenCaiTien: tenCaiTien,
       tinhTrangTruoc: document.getElementById('q_tinhTrangTruoc').value,
       noiDungGiaiPhap: document.getElementById('q_noiDungGiaiPhap').value,
       loiIchDuKien: document.getElementById('q_loiIchDuKien').value,
       trangThai: 'Phiếu nhanh'
     };
 
-    if (!payload.tenCaiTien.trim()) {
+    const success = await saveData(payload);
+    if (success) {
+      document.getElementById('q_tacGia').value = '';
+      document.getElementById('q_boPhan').value = '';
+      document.getElementById('q_tenCaiTien').value = '';
+      document.getElementById('q_tinhTrangTruoc').value = '';
+      document.getElementById('q_noiDungGiaiPhap').value = '';
+      document.getElementById('q_loiIchDuKien').value = '';
+
+      switchTab('tracker');
+      setTimeout(loadData, 1200); // Đợi Power Automate xử lý hoàn tất rồi mới tải dữ liệu
+    }
+  }
+
+  async function submitFullForm() {
+    const tenCaiTien = document.getElementById('f_tenCaiTien').value;
+    if (!tenCaiTien.trim()) {
       alert("Vui lòng nhập tên cải tiến!");
       return;
     }
 
-    await saveData(payload);
-
-    document.getElementById('q_tacGia').value = '';
-    document.getElementById('q_boPhan').value = '';
-    document.getElementById('q_tenCaiTien').value = '';
-    document.getElementById('q_tinhTrangTruoc').value = '';
-    document.getElementById('q_noiDungGiaiPhap').value = '';
-    document.getElementById('q_loiIchDuKien').value = '';
-
-    switchTab('tracker');
-    loadData();
-  }
-
-  async function submitFullForm() {
     const payload = {
       action: editingId ? 'UPDATE' : 'CREATE',
       id: editingId,
-      soPhieu: document.getElementById('f_soPhieu').value,
-      ngayDangKy: document.getElementById('f_ngayDangKy').value,
+      soPhieu: document.getElementById('f_soPhieu').value || ('SK-' + Date.now().toString().slice(-4)),
+      ngayDangKy: document.getElementById('f_ngayDangKy').value || new Date().toISOString().slice(0, 10),
       tacGia: document.getElementById('f_tacGia').value,
       maNV: document.getElementById('f_maNV').value,
       boPhan: document.getElementById('f_boPhan').value,
       chucVu: document.getElementById('f_chucVu').value,
-      tenCaiTien: document.getElementById('f_tenCaiTien').value,
+      tenCaiTien: tenCaiTien,
       tinhTrangTruoc: document.getElementById('f_tinhTrangTruoc').value,
       noiDungGiaiPhap: document.getElementById('f_noiDungGiaiPhap').value,
       loiIchDuKien: document.getElementById('f_loiIchDuKien').value,
@@ -276,27 +297,41 @@
       trangThai: document.getElementById('f_trangThai').value
     };
 
-    await saveData(payload);
-    resetForm();
-    switchTab('tracker');
-    loadData();
+    const success = await saveData(payload);
+    if (success) {
+      resetForm();
+      switchTab('tracker');
+      setTimeout(loadData, 1200);
+    }
   }
 
   async function saveData(payload) {
-    if (FLOW_POST_URL.includes("PASTE_")) {
+    if (!FLOW_API_URL || FLOW_API_URL.includes("PASTE_")) {
       alert("Hệ thống chưa được dán link API Power Automate!");
-      return;
+      return false;
     }
 
     try {
-      await fetch(FLOW_POST_URL, {
+      document.getElementById('syncIndicator').style.background = '#eab308';
+      document.getElementById('syncText').innerText = 'Đang lưu dữ liệu...';
+      
+      const res = await fetch(FLOW_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+
+      if (!res.ok) throw new Error("Gửi dữ liệu thất bại");
+
+      document.getElementById('syncIndicator').style.background = '#22c55e';
+      document.getElementById('syncText').innerText = 'Đã lưu Cloud thành công';
+      return true;
     } catch (err) {
-      alert("Lỗi khi gửi dữ liệu lên Cloud!");
+      alert("Lỗi khi gửi dữ liệu lên Cloud! Kiểm tra lại kết nối mạng hoặc Power Automate Flow.");
       console.error(err);
+      document.getElementById('syncIndicator').style.background = '#ef4444';
+      document.getElementById('syncText').innerText = 'Lỗi gửi dữ liệu';
+      return false;
     }
   }
 
@@ -326,8 +361,10 @@
 
   async function deleteEntry(id) {
     if (!confirm("Bạn có chắc chắn muốn xoá sáng kiến này?")) return;
-    await saveData({ action: 'DELETE', id: id });
-    loadData();
+    const success = await saveData({ action: 'DELETE', id: id });
+    if (success) {
+      setTimeout(loadData, 1000);
+    }
   }
 
   function resetForm() {

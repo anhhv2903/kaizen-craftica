@@ -58,7 +58,7 @@
     </div>
     <div class="sync-status">
       <div class="sync-dot" id="syncIndicator"></div>
-      <span id="syncText">Đã đồng bộ Real-time</span>
+      <span id="syncText">Đang kết nối Cloud...</span>
     </div>
   </div>
 
@@ -154,3 +154,189 @@
     </div>
   </div>
 </div>
+
+<script>
+  // Dán URL HTTP Endpoint từ Power Automate vào đây
+  const FLOW_GET_URL = "PASTE_POWER_AUTOMATE_GET_URL_HERE";
+  const FLOW_POST_URL = "PASTE_POWER_AUTOMATE_POST_URL_HERE";
+
+  let entriesList = [];
+  let editingId = null;
+
+  function switchTab(tabName) {
+    document.getElementById("panelQuick").style.display = tabName === 'quick' ? 'block' : 'none';
+    document.getElementById("panelForm").style.display = tabName === 'form' ? 'block' : 'none';
+    document.getElementById("panelTracker").style.display = tabName === 'tracker' ? 'block' : 'none';
+
+    document.getElementById("tabQuickBtn").className = 'nav-btn ' + (tabName === 'quick' ? 'active' : '');
+    document.getElementById("tabFormBtn").className = 'nav-btn ' + (tabName === 'form' ? 'active' : '');
+    document.getElementById("tabTrackerBtn").className = 'nav-btn ' + (tabName === 'tracker' ? 'active' : '');
+  }
+
+  async function loadData() {
+    if (FLOW_GET_URL.includes("PASTE_")) {
+      document.getElementById('syncIndicator').style.background = '#eab308';
+      document.getElementById('syncText').innerText = 'Chưa cấu hình API URL';
+      return;
+    }
+
+    try {
+      document.getElementById('syncText').innerText = 'Đang tải dữ liệu...';
+      const res = await fetch(FLOW_GET_URL);
+      const data = await res.json();
+      
+      entriesList = data || [];
+      renderTable();
+      
+      document.getElementById('syncIndicator').style.background = '#22c55e';
+      document.getElementById('syncText').innerText = 'Đã đồng bộ Cloud';
+    } catch (err) {
+      console.error(err);
+      document.getElementById('syncIndicator').style.background = '#ef4444';
+      document.getElementById('syncText').innerText = 'Lỗi kết nối CSDL';
+    }
+  }
+
+  function renderTable() {
+    document.getElementById('countDisplay').innerText = entriesList.length;
+    const tbody = document.getElementById('trackerTableBody');
+    if (entriesList.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:15px; color:#94a3b8;">Chưa có dữ liệu nào</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = entriesList.map((item, idx) => `
+      <tr>
+        <td>${idx + 1}</td>
+        <td><b>${item.soPhieu || '—'}</b></td>
+        <td>${item.tacGia || '—'}</td>
+        <td>${item.boPhan || '—'}</td>
+        <td>${item.ngayDangKy || '—'}</td>
+        <td>${item.tenCaiTien || '—'}</td>
+        <td style="font-size:11px;">${item.noiDungGiaiPhap || '—'}</td>
+        <td><span style="font-size:11px; background:#f1f5f9; padding:2px 6px; border-radius:4px;">${item.trangThai || 'Mới đăng ký'}</span></td>
+        <td>
+          <button class="action-btn btn-edit" onclick="editEntry('${item.id}')">Sửa</button>
+          <button class="action-btn btn-del" onclick="deleteEntry('${item.id}')">Xoá</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  async function submitQuick() {
+    const payload = {
+      action: 'CREATE',
+      soPhieu: 'QN-' + Date.now().toString().slice(-4),
+      ngayDangKy: new Date().toISOString().slice(0, 10),
+      tacGia: document.getElementById('q_tacGia').value,
+      boPhan: document.getElementById('q_boPhan').value,
+      tenCaiTien: document.getElementById('q_tenCaiTien').value,
+      tinhTrangTruoc: document.getElementById('q_tinhTrangTruoc').value,
+      noiDungGiaiPhap: document.getElementById('q_noiDungGiaiPhap').value,
+      loiIchDuKien: document.getElementById('q_loiIchDuKien').value,
+      trangThai: 'Phiếu nhanh'
+    };
+
+    if (!payload.tenCaiTien.trim()) {
+      alert("Vui lòng nhập tên cải tiến!");
+      return;
+    }
+
+    await saveData(payload);
+
+    document.getElementById('q_tacGia').value = '';
+    document.getElementById('q_boPhan').value = '';
+    document.getElementById('q_tenCaiTien').value = '';
+    document.getElementById('q_tinhTrangTruoc').value = '';
+    document.getElementById('q_noiDungGiaiPhap').value = '';
+    document.getElementById('q_loiIchDuKien').value = '';
+
+    switchTab('tracker');
+    loadData();
+  }
+
+  async function submitFullForm() {
+    const payload = {
+      action: editingId ? 'UPDATE' : 'CREATE',
+      id: editingId,
+      soPhieu: document.getElementById('f_soPhieu').value,
+      ngayDangKy: document.getElementById('f_ngayDangKy').value,
+      tacGia: document.getElementById('f_tacGia').value,
+      maNV: document.getElementById('f_maNV').value,
+      boPhan: document.getElementById('f_boPhan').value,
+      chucVu: document.getElementById('f_chucVu').value,
+      tenCaiTien: document.getElementById('f_tenCaiTien').value,
+      tinhTrangTruoc: document.getElementById('f_tinhTrangTruoc').value,
+      noiDungGiaiPhap: document.getElementById('f_noiDungGiaiPhap').value,
+      loiIchDuKien: document.getElementById('f_loiIchDuKien').value,
+      yKienCanBo: document.getElementById('f_yKienCanBo').value,
+      yKienBanSKCT: document.getElementById('f_yKienBanSKCT').value,
+      danhGiaTBP: document.getElementById('f_danhGiaTBP').value,
+      pheDuyetKhenThuong: document.getElementById('f_khenThuong').value,
+      trangThai: document.getElementById('f_trangThai').value
+    };
+
+    await saveData(payload);
+    resetForm();
+    switchTab('tracker');
+    loadData();
+  }
+
+  async function saveData(payload) {
+    if (FLOW_POST_URL.includes("PASTE_")) {
+      alert("Hệ thống chưa được dán link API Power Automate!");
+      return;
+    }
+
+    try {
+      await fetch(FLOW_POST_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } catch (err) {
+      alert("Lỗi khi gửi dữ liệu lên Cloud!");
+      console.error(err);
+    }
+  }
+
+  function editEntry(id) {
+    const item = entriesList.find(e => String(e.id) === String(id));
+    if (!item) return;
+
+    editingId = id;
+    document.getElementById('f_soPhieu').value = item.soPhieu || '';
+    document.getElementById('f_ngayDangKy').value = item.ngayDangKy || '';
+    document.getElementById('f_tacGia').value = item.tacGia || '';
+    document.getElementById('f_maNV').value = item.maNV || '';
+    document.getElementById('f_boPhan').value = item.boPhan || '';
+    document.getElementById('f_chucVu').value = item.chucVu || '';
+    document.getElementById('f_tenCaiTien').value = item.tenCaiTien || '';
+    document.getElementById('f_tinhTrangTruoc').value = item.tinhTrangTruoc || '';
+    document.getElementById('f_noiDungGiaiPhap').value = item.noiDungGiaiPhap || '';
+    document.getElementById('f_loiIchDuKien').value = item.loiIchDuKien || '';
+    document.getElementById('f_yKienCanBo').value = item.yKienCanBo || '';
+    document.getElementById('f_yKienBanSKCT').value = item.yKienBanSKCT || '';
+    document.getElementById('f_danhGiaTBP').value = item.danhGiaTBP || '';
+    document.getElementById('f_khenThuong').value = item.pheDuyetKhenThuong || '';
+    document.getElementById('f_trangThai').value = item.trangThai || 'Mới đăng ký';
+
+    switchTab('form');
+  }
+
+  async function deleteEntry(id) {
+    if (!confirm("Bạn có chắc chắn muốn xoá sáng kiến này?")) return;
+    await saveData({ action: 'DELETE', id: id });
+    loadData();
+  }
+
+  function resetForm() {
+    editingId = null;
+    document.querySelectorAll('#panelForm input, #panelForm textarea').forEach(el => el.value = '');
+    document.getElementById('f_trangThai').value = 'Mới đăng ký';
+  }
+
+  window.onload = loadData;
+</script>
+</body>
+</html>

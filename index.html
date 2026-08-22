@@ -385,58 +385,63 @@ document.addEventListener('DOMContentLoaded', async function() {
   </script>
   <!-- ĐOẠN SCRIPT ĐỒNG BỘ POWER AUTOMATE -->
 <script>
+  <script>
   window.addEventListener('DOMContentLoaded', () => {
-    // Chờ 1.5 giây để Bundler giải nén và render xong giao diện HTML
     setTimeout(() => {
       const API_GET_URL = "https://defaultb9f85395de73470c8b9140e902d6d9.2f.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/21/workflows/0e3d1c0ad1e44132a6929d2b2fb9c0a2/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=0ryLCC_vCQ3LdmasaXNbZhKeSGJM46O_cZAuVvQMEU8";
       const API_SAVE_URL = "https://defaultb9f85395de73470c8b9140e902d6d9.2f.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/23/workflows/40346a2ab551465688563233c4b02cc9/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=IyacKeTsz2jOAzqV4-uK7Atvr1JY727ZQcrvEu3giOU";
 
-      // 1. Tải dữ liệu từ SharePoint về
-      async function loadCloudData() {
+      // 1. Kéo dữ liệu từ SharePoint về qua phương thức GET
+      async function syncDataFromCloud() {
         try {
-          const res = await fetch(API_GET_URL);
+          const res = await fetch(API_GET_URL, { method: 'GET' });
           if (res.ok) {
             const data = await res.json();
-            console.log("Dữ liệu nạp từ Power Automate:", data);
-            // Nếu có hàm renderUI của ứng dụng MoM Craftica, gọi ở đây
+            const listItems = Array.isArray(data) ? data : (data.value || []);
+            
+            if (listItems.length > 0) {
+              localStorage.setItem('mom_tracker_data', JSON.stringify(listItems));
+              window.dispatchEvent(new Event('storage'));
+              console.log("Đã tải dữ liệu thành công từ Cloud:", listItems);
+            }
+          } else {
+            console.error("Lỗi lấy dữ liệu status:", res.status);
           }
         } catch (err) {
-          console.error("Lỗi lấy dữ liệu:", err);
+          console.error("Lỗi kết nối API Get:", err);
         }
       }
 
-      // 2. Bắt sự kiện gửi dữ liệu
-      const form = document.querySelector('form');
-      if (form) {
-        form.addEventListener('submit', async (e) => {
-          e.preventDefault();
-          
-          // Lấy toàn bộ dữ liệu nhập trên Form
-          const formData = new FormData(form);
-          const payload = Object.fromEntries(formData.entries());
-
-          try {
-            const res = await fetch(API_SAVE_URL, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
-            });
-
-            if (res.ok) {
-              alert("Lưu dữ liệu MOM thành công!");
-              loadCloudData();
-            } else {
-              alert("Lỗi khi lưu dữ liệu qua Power Automate!");
+      // 2. Đồng bộ khi bấm nút Lưu
+      document.addEventListener('click', async (e) => {
+        const btn = e.target.closest('button');
+        if (btn && (btn.innerText.includes('Lưu') || btn.innerText.includes('Save'))) {
+          setTimeout(async () => {
+            const currentData = localStorage.getItem('mom_tracker_data');
+            if (currentData) {
+              try {
+                const saveRes = await fetch(API_SAVE_URL, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: currentData
+                });
+                
+                if (saveRes.ok) {
+                  alert("Đã lưu và đồng bộ thành công!");
+                  const trackerTab = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('MOM Tracker'));
+                  if (trackerTab) trackerTab.click();
+                }
+              } catch (err) {
+                console.error("Lỗi lưu dữ liệu:", err);
+              }
             }
-          } catch (err) {
-            alert("Không thể kết nối máy chủ!");
-          }
-        });
-      }
+          }, 500);
+        }
+      });
 
-      // Gọi nạp dữ liệu lần đầu
-      loadCloudData();
-    }, 1500); 
+      // Chạy lấy dữ liệu ngay khi tải trang
+      syncDataFromCloud();
+    }, 1000);
   });
 </script>
 </body>
